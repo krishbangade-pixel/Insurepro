@@ -23,14 +23,19 @@ export default function CustomersPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
-  const fetchCustomers = () => {
+  const fetchCustomers = async () => {
     setLoading(true);
-    api.get('/customers')
-      .then((res) => setCustomers((res.data.data || []).map(mapCustomer)))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    try {
+      const res = await api.get('/customers');
+      setCustomers((res.data.data || []).map(mapCustomer));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchCustomers(); }, []);
 
   // New Customer Form State

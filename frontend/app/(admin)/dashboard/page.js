@@ -60,6 +60,12 @@ export default function AdminDashboard() {
   const [recentNotificationsData, setRecentNotificationsData] = useState([]);
   const [claimsByCategoryData, setClaimsByCategoryData] = useState([]);
 
+  // Form states for Quick Actions (must be declared before any early return)
+  const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [policyType, setPolicyType] = useState('Health Insurance');
+  const [claimAmount, setClaimAmount] = useState('');
+
   useEffect(() => {
     api.get('/reports/dashboard')
       .then((res) => {
@@ -83,11 +89,7 @@ export default function AdminDashboard() {
   if (loading) return <PageLoader />;
   if (error) return <PageError message={error} />;
 
-  // Form states for Quick Actions
-  const [customerName, setCustomerName] = useState('');
-  const [customerEmail, setCustomerEmail] = useState('');
-  const [policyType, setPolicyType] = useState('Health Insurance');
-  const [claimAmount, setClaimAmount] = useState('');
+
 
   const handleQuickSubmit = (title) => {
     setActiveModal(null);

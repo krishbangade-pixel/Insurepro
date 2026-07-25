@@ -18,12 +18,29 @@ async function authMiddleware(req, res, next) {
       return res.status(401).json({ success: false, message: 'Invalid or expired token' });
     }
 
-    // Attach user info to request
+    // Roles are stored in the protected profiles table, rather than user
+    // metadata. User metadata can be changed by the account owner, so it must
+    // not be used to grant administrative access.
+    const [profileResult, agentResult, legacyUserResult] = await Promise.all([
+      supabase.from('profiles').select('id, full_name, role').eq('id', user.id).maybeSingle(),
+      // The existing schema links policies to agents.id. Agents are matched by
+      // email because the legacy agents.user_id points to public.users, not
+      // Supabase auth.users.
+      supabase.from('agents').select('id').eq('email', user.email).maybeSingle(),
+      // claims.reviewed_by and audit_logs.user_id still reference public.users.
+      supabase.from('users').select('id').eq('email', user.email).maybeSingle(),
+    ]);
+
+    const { data: profile, error: profileError } = profileResult;
+
+    if (profileError) throw profileError;
     req.user = {
       id: user.id,
       email: user.email,
-      role: user.user_metadata?.role || 'Customer',
-      fullName: user.user_metadata?.full_name || '',
+      role: profile?.role || 'Customer',
+      fullName: profile?.full_name || user.user_metadata?.full_name || '',
+      agentId: agentResult.data?.id || null,
+      legacyUserId: legacyUserResult.data?.id || null,
     };
 
     next();

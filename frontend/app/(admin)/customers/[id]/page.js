@@ -20,19 +20,39 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs } from '@/components/ui/Tabs';
 import toast from 'react-hot-toast';
-import { customersList, policiesList, recentClaimsData, documentsList } from '@/lib/mockData';
+import api from '@/lib/api';
 
 export default function CustomerDetailsPage() {
   const params = useParams();
   const router = useRouter();
-  const customerId = params.id || 'CUST-8041';
-
-  const customer = customersList.find((c) => c.id === customerId) || customersList[0];
-  const customerPolicies = policiesList.filter((p) => p.holder === customer.name || true).slice(0, 3);
-  const customerClaims = recentClaimsData.slice(0, 2);
-  const customerDocs = documentsList.slice(0, 3);
-
+  const customerId = params.id;
+  const [customer, setCustomer] = useState(null);
+  const [customerPolicies, setCustomerPolicies] = useState([]);
+  const [customerClaims, setCustomerClaims] = useState([]);
+  const [customerDocs, setCustomerDocs] = useState([]);
   const [activeTab, setActiveTab] = useState('policies');
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchAll = async () => {
+      try {
+        const custRes = await api.get(`/customers/${customerId}`);
+        if (!mounted) return;
+        setCustomer(custRes.data.data);
+        const polRes = await api.get('/policies', { params: { customer_id: customerId, limit: 10 } });
+        const clRes = await api.get('/claims', { params: { customer_id: customerId, limit: 10 } });
+        const docRes = await api.get('/documents', { params: { customer_id: customerId, limit: 10 } });
+        if (!mounted) return;
+        setCustomerPolicies(polRes.data.data || []);
+        setCustomerClaims(clRes.data.data || []);
+        setCustomerDocs(docRes.data.data || []);
+      } catch (e) {
+        toast.error(e.response?.data?.message || e.message);
+      }
+    };
+    fetchAll();
+    return () => { mounted = false; };
+  }, [customerId]);
 
   return (
     <div className="space-y-6">
@@ -51,24 +71,24 @@ export default function CustomerDetailsPage() {
       <Card className="p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start sm:items-center space-x-4">
-            <img
-              src={customer.avatar}
-              alt={customer.name}
+              <img
+              src={customer?.avatar_url || '/placeholder.png'}
+              alt={customer?.name}
               className="w-16 h-16 rounded-2xl object-cover ring-4 ring-brand-500/20"
             />
             <div className="space-y-1">
               <div className="flex items-center space-x-3">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                  {customer.name}
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                  {customer?.name}
                 </h2>
-                <Badge variant={customer.status === 'Active' ? 'success' : 'warning'}>
-                  {customer.status}
+                <Badge variant={customer?.status === 'Active' ? 'success' : 'warning'}>
+                  {customer?.status}
                 </Badge>
                 <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300">
-                  {customer.tier} Tier
+                  {customer?.tier} Tier
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-mono">Customer ID: {customer.id}</p>
+              <p className="text-xs text-slate-500 font-mono">Customer ID: {customer?.id}</p>
               <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-1">
                 <span className="flex items-center"><Mail className="w-3.5 h-3.5 mr-1" />{customer.email}</span>
                 <span className="flex items-center"><Phone className="w-3.5 h-3.5 mr-1" />{customer.phone}</span>
@@ -90,12 +110,12 @@ export default function CustomerDetailsPage() {
         {/* Stats Metrics Sub-Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
           <div>
-            <p className="text-xs text-slate-500">Active Policies</p>
-            <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">{customer.policiesCount}</p>
+                <p className="text-xs text-slate-500">Active Policies</p>
+            <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">{customerPolicies.length}</p>
           </div>
           <div>
             <p className="text-xs text-slate-500">Total Premiums Paid</p>
-            <p className="text-lg font-bold text-brand-600 dark:text-brand-400 mt-0.5">{customer.totalPremiums}</p>
+            <p className="text-lg font-bold text-brand-600 dark:text-brand-400 mt-0.5">{customer?.totalPremiums || '-'}</p>
           </div>
           <div>
             <p className="text-xs text-slate-500">Underwriting Risk Score</p>
@@ -132,15 +152,15 @@ export default function CustomerDetailsPage() {
                   </div>
                   <div>
                     <div className="flex items-center space-x-2">
-                      <span className="font-bold text-slate-900 dark:text-white font-mono">{pol.id}</span>
+                      <span className="font-bold text-slate-900 dark:text-white font-mono">{pol.policy_number || pol.id}</span>
                       <Badge variant="success">{pol.status}</Badge>
                     </div>
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5">{pol.planName}</p>
-                    <p className="text-[11px] text-slate-400">Coverage: {pol.coverage} • Valid: {pol.startDate} - {pol.endDate}</p>
+                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5">{pol.plan_name}</p>
+                    <p className="text-[11px] text-slate-400">Coverage: {pol.coverage_amount} • Valid: {pol.start_date} - {pol.end_date}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-slate-900 dark:text-white">{pol.premium}</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">{pol.premium_amount}</p>
                   <Button variant="ghost" size="sm" className="text-xs text-brand-600" onClick={() => router.push('/policies')}>
                     View Policy Details →
                   </Button>
@@ -161,14 +181,14 @@ export default function CustomerDetailsPage() {
                   </div>
                   <div>
                     <div className="flex items-center space-x-2">
-                      <span className="font-bold text-slate-900 dark:text-white font-mono">{claim.id}</span>
+                      <span className="font-bold text-slate-900 dark:text-white font-mono">{claim.claim_number || claim.id}</span>
                       <Badge variant={claim.status === 'Approved' ? 'success' : 'info'}>{claim.status}</Badge>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">Policy: {claim.policyNumber} • Submitted: {claim.submittedOn}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Policy: {claim.policy_id} • Submitted: {new Date(claim.created_at).toLocaleDateString()}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-slate-900 dark:text-white">{claim.claimAmount}</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">{claim.amount}</p>
                   <Button variant="ghost" size="sm" className="text-xs text-brand-600" onClick={() => router.push('/claims')}>
                     Review Timeline →
                   </Button>

@@ -1,12 +1,22 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
-import { customersList } from '@/lib/mockData';
+import api from '@/lib/api';
 
 export default function AgentCustomersPage() {
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    api.get('/customers').then((r) => { if (mounted) setCustomers(r.data.data || []); }).catch((e) => { if (mounted) setError(e.message); }).finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, []);
+
   const columns = [
     { header: 'ID', accessorKey: 'id' },
     { header: 'Customer', accessorKey: 'name' },
@@ -19,7 +29,7 @@ export default function AgentCustomersPage() {
     <div className="space-y-6">
       <h2 className="text-xl font-bold">Assigned Accounts & Clients</h2>
       <Card className="p-6">
-        <DataTable columns={columns} data={customersList} searchPlaceholder="Search clients..." />
+        <DataTable columns={columns} data={customers} loading={loading} error={error} searchPlaceholder="Search clients..." />
       </Card>
     </div>
   );

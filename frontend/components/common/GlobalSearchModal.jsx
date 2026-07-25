@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Search, Shield, Users, FileText, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { policiesList, customersList, recentClaimsData } from '@/lib/mockData';
+import api from '@/lib/api';
 
 export function GlobalSearchModal({ isOpen, onClose }) {
   const [query, setQuery] = useState('');
@@ -14,32 +14,38 @@ export function GlobalSearchModal({ isOpen, onClose }) {
     return useRouter();
   }
 
-  const filteredPolicies = query
-    ? policiesList.filter(
-        (p) =>
-          p.id.toLowerCase().includes(query.toLowerCase()) ||
-          p.holder.toLowerCase().includes(query.toLowerCase()) ||
-          p.type.toLowerCase().includes(query.toLowerCase())
-      )
-    : [];
+  const [filteredPolicies, setFilteredPolicies] = useState([]);
+  const [filteredCustomers, setFilteredCustomers] = useState([]);
+  const [filteredClaims, setFilteredClaims] = useState([]);
 
-  const filteredCustomers = query
-    ? customersList.filter(
-        (c) =>
-          c.name.toLowerCase().includes(query.toLowerCase()) ||
-          c.email.toLowerCase().includes(query.toLowerCase()) ||
-          c.id.toLowerCase().includes(query.toLowerCase())
-      )
-    : [];
+  useEffect(() => {
+    let mounted = true;
+    const doSearch = async () => {
+      if (!query || query.length < 2) {
+        if (mounted) {
+          setFilteredPolicies([]); setFilteredCustomers([]); setFilteredClaims([]);
+        }
+        return;
+      }
 
-  const filteredClaims = query
-    ? recentClaimsData.filter(
-        (cl) =>
-          cl.id.toLowerCase().includes(query.toLowerCase()) ||
-          cl.customer.name.toLowerCase().includes(query.toLowerCase()) ||
-          cl.policyNumber.toLowerCase().includes(query.toLowerCase())
-      )
-    : [];
+      try {
+        const [polRes, custRes, claimRes] = await Promise.all([
+          api.get('/policies', { params: { search: query, limit: 6 } }).catch(() => ({ data: { data: [] } })),
+          api.get('/customers', { params: { search: query, limit: 6 } }).catch(() => ({ data: { data: [] } })),
+          api.get('/claims', { params: { search: query, limit: 6 } }).catch(() => ({ data: { data: [] } })),
+        ]);
+        if (!mounted) return;
+        setFilteredPolicies(polRes.data.data || []);
+        setFilteredCustomers(custRes.data.data || []);
+        setFilteredClaims(claimRes.data.data || []);
+      } catch (e) {
+        // ignore search errors
+      }
+    };
+
+    const t = setTimeout(doSearch, 250);
+    return () => { mounted = false; clearTimeout(t); };
+  }, [query]);
 
   const navigateTo = (path) => {
     onClose();

@@ -1,11 +1,10 @@
 # InsurePro Backend API
 
-Custom JWT-based authentication system using Node.js, Express, and PostgreSQL (Supabase).
+Express API for the InsurePro Next.js frontend. Authentication is provided by Supabase Auth; this API verifies the Supabase access token sent by the frontend.
 
 ## Features
 
-- JWT Authentication with HTTP-only cookies
-- Password hashing with bcrypt
+- Supabase Auth access-token verification
 - Role-based authorization (Admin, Insurance Agent, Customer)
 - Input validation with express-validator
 - Secure password reset flow
@@ -29,17 +28,16 @@ npm install
 
 2. Set up environment variables:
 ```bash
-cp .env.example .env
+copy .env.example .env
 ```
 
 3. Update `.env` with your configuration:
 ```env
 PORT=5000
 NODE_ENV=development
-JWT_SECRET=your-super-secret-jwt-key-change-in-production-min-32-chars
-JWT_EXPIRES_IN=7d
-DATABASE_URL=postgresql://user:password@host:port/database
 CORS_ORIGIN=http://localhost:3000
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
 4. Set up the database schema:
@@ -66,101 +64,28 @@ The server will start on `http://localhost:5000`
 
 ### Authentication
 
-#### POST /api/auth/register
-Register a new user
-
-**Request Body:**
-```json
-{
-  "fullName": "John Doe",
-  "email": "john@example.com",
-  "gender": "Male",
-  "role": "Customer",
-  "password": "Password123",
-  "confirmPassword": "Password123"
-}
-```
-
-#### POST /api/auth/login
-Login user
-
-**Request Body:**
-```json
-{
-  "email": "john@example.com",
-  "password": "Password123"
-}
-```
-
-**Response:** Sets HTTP-only cookie with JWT token
-
-#### POST /api/auth/logout
-Logout user (requires authentication)
-
-#### GET /api/auth/me
-Get current user (requires authentication)
-
-#### POST /api/auth/forgot-password
-Request password reset
-
-**Request Body:**
-```json
-{
-  "email": "john@example.com"
-}
-```
-
-#### POST /api/auth/reset-password
-Reset password with token
-
-**Request Body:**
-```json
-{
-  "token": "reset-token-here",
-  "password": "NewPassword123",
-  "confirmPassword": "NewPassword123"
-}
-```
+The frontend signs users in, registers users, and resets passwords through Supabase Auth. Every protected API request includes the Supabase access token as a Bearer token; `src/middleware/auth.js` verifies it and reads the user’s role from `profiles`.
 
 ## Middleware
 
-### authMiddleware
-Verifies JWT token and attaches user to `req.user`
+### auth
+Verifies the Supabase token and attaches the authenticated user to `req.user`.
 
 ### roleMiddleware(...allowedRoles)
 Checks if user has required role
 
 **Usage:**
 ```javascript
-router.get('/admin', authMiddleware, roleMiddleware('Admin'), controller);
+router.get('/admin', auth, roleCheck('Admin'), controller);
 ```
 
 ## Database Schema
 
-### Users Table
-- `id` (UUID, primary key)
-- `full_name` (VARCHAR)
-- `email` (VARCHAR, unique)
-- `password` (VARCHAR, hashed)
-- `gender` (VARCHAR: Male/Female)
-- `role` (VARCHAR: Customer/Insurance Agent/Admin)
-- `is_active` (BOOLEAN)
-- `created_at` (TIMESTAMP)
-- `updated_at` (TIMESTAMP)
-
-### Password Reset Tokens Table
-- `id` (UUID, primary key)
-- `user_id` (UUID, foreign key)
-- `token` (VARCHAR)
-- `expires_at` (TIMESTAMP)
-- `used` (BOOLEAN)
-- `created_at` (TIMESTAMP)
+Supabase owns the `auth.users` table. Application-specific identity data, including roles, is stored in `profiles`; the remaining business tables are defined in `src/database/schema.sql`.
 
 ## Security Features
 
-- Password hashing with bcrypt (10 salt rounds)
-- JWT tokens with configurable expiration
-- HTTP-only cookies for token storage
+- Supabase manages passwords, sessions, and refresh tokens
 - Rate limiting (100 requests per 15 minutes)
 - Helmet security headers
 - CORS configuration
@@ -203,6 +128,4 @@ backend/
 ## Development Notes
 
 - The backend runs on port 5000 by default
-- JWT secret must be at least 32 characters in production
-- Database URL should be obtained from Supabase project settings
-- In development, reset tokens are returned in response (remove in production)
+- Add the Service Role key only to `backend/.env`; never expose it in the frontend.

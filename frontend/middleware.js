@@ -44,6 +44,12 @@ export async function middleware(request) {
   const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password'];
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
 
+  const dashboardForRole = (role) => {
+    if (role === 'Insurance Agent') return '/agent/dashboard';
+    if (role === 'Customer') return '/customer/dashboard';
+    return '/dashboard';
+  };
+
   // Auth callback route (always allow)
   if (pathname.startsWith('/auth/callback')) {
     return supabaseResponse;
@@ -57,10 +63,35 @@ export async function middleware(request) {
     return NextResponse.redirect(url);
   }
 
-  // If user is logged in and trying to access auth pages, redirect to dashboard
+  let role = user?.user_metadata?.role || 'Customer';
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+    role = profile?.role || role;
+  }
+
+  // If user is logged in and trying to access auth pages, redirect to their own dashboard.
   if (user && isPublicRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
+    url.pathname = dashboardForRole(role);
+    return NextResponse.redirect(url);
+  }
+
+  // Do not allow a user to open another role's portal by editing the URL.
+  const isAgentRoute = pathname.startsWith('/agent');
+  const isCustomerRoute = pathname.startsWith('/customer');
+  const isAdminRoute = !isPublicRoute && pathname !== '/' && !isAgentRoute && !isCustomerRoute;
+  const routeIsAllowed =
+    (role === 'Admin' && isAdminRoute) ||
+    (role === 'Insurance Agent' && isAgentRoute) ||
+    (role === 'Customer' && isCustomerRoute);
+
+  if (user && !routeIsAllowed && pathname !== '/') {
+    const url = request.nextUrl.clone();
+    url.pathname = dashboardForRole(role);
     return NextResponse.redirect(url);
   }
 

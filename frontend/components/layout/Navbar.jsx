@@ -11,11 +11,8 @@ import {
   Moon,
   ChevronDown,
   LogOut,
-  User,
   Settings as SettingsIcon,
   Menu,
-  ShieldCheck,
-  UserCheck,
   Loader2,
 } from 'lucide-react';
 import { Breadcrumb } from './Breadcrumb';
@@ -162,45 +159,6 @@ export function Navbar({ onMobileMenuToggle }) {
                     <p className="text-[11px] text-slate-500 truncate">
                       {displayEmail}
                     </p>
-                  </div>
-
-                  {/* Switch Portal Options */}
-                  <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 border-y border-slate-100 dark:border-slate-800">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Switch Role Portal
-                    </p>
-                    <div className="space-y-1">
-                      <button
-                        onClick={() => {
-                          setIsProfileOpen(false);
-                          router.push('/dashboard');
-                        }}
-                        className="w-full px-2 py-1 text-left text-xs font-medium rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center space-x-2 text-emerald-700 dark:text-emerald-400"
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        <span>Admin Dashboard</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setIsProfileOpen(false);
-                          router.push('/agent/dashboard');
-                        }}
-                        className="w-full px-2 py-1 text-left text-xs font-medium rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center space-x-2 text-purple-700 dark:text-purple-400"
-                      >
-                        <UserCheck className="w-3.5 h-3.5" />
-                        <span>Agent Workstation</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setIsProfileOpen(false);
-                          router.push('/customer/dashboard');
-                        }}
-                        className="w-full px-2 py-1 text-left text-xs font-medium rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center space-x-2 text-blue-700 dark:text-blue-400"
-                      >
-                        <User className="w-3.5 h-3.5" />
-                        <span>Customer Portal</span>
-                      </button>
-                    </div>
                   </div>
 
                   <div className="py-1">

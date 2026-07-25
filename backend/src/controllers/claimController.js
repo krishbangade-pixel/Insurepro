@@ -50,7 +50,7 @@ exports.update = async (req, res, next) => {
 
 exports.approve = async (req, res, next) => {
   try {
-    const { data, error } = await supabase.from('claims').update({ status: 'Approved', reviewed_by: req.user.id, reviewed_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
+    const { data, error } = await supabase.from('claims').update({ status: 'Approved', reviewed_by: req.user.legacyUserId, reviewed_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
     if (error) throw error;
     res.json({ success: true, data });
   } catch (err) { next(err); }
@@ -58,7 +58,7 @@ exports.approve = async (req, res, next) => {
 
 exports.reject = async (req, res, next) => {
   try {
-    const { data, error } = await supabase.from('claims').update({ status: 'Rejected', reviewed_by: req.user.id, reviewed_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
+    const { data, error } = await supabase.from('claims').update({ status: 'Rejected', reviewed_by: req.user.legacyUserId, reviewed_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
     if (error) throw error;
     res.json({ success: true, data });
   } catch (err) { next(err); }

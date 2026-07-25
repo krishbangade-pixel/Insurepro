@@ -72,14 +72,6 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
         { name: 'My Profile', href: '/agent/profile', icon: User },
       ],
     },
-    {
-      title: 'SHARED SERVICES',
-      items: [
-        { name: 'Reports & Analytics', href: '/reports', icon: BarChart3 },
-        { name: 'System Notifications', href: '/notifications', icon: Bell, badge: '5' },
-        { name: 'Switch to Admin View', href: '/dashboard', icon: Shield },
-      ],
-    },
   ];
 
   const customerSections = [
@@ -97,7 +89,6 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
       title: 'ACCOUNT',
       items: [
         { name: 'My Profile', href: '/customer/profile', icon: User },
-        { name: 'Switch to Admin View', href: '/dashboard', icon: Shield },
       ],
     },
   ];

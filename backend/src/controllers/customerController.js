@@ -3,16 +3,24 @@ const supabase = require('../lib/supabase');
 exports.getAll = async (req, res, next) => {
   try {
     const { search, status, tier, page = 1, limit = 50 } = req.query;
-    let query = supabase.from('customers').select('*', { count: 'exact' });
+    // Role-based filtering
+    let base = supabase.from('customers').select('*', { count: 'exact' });
 
-    if (search) query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
-    if (status) query = query.eq('status', status);
-    if (tier) query = query.eq('tier', tier);
+    if (req.user.role === 'Insurance Agent') {
+      base = base.eq('created_by', req.user.id);
+    } else if (req.user.role === 'Customer') {
+      // Customers only see their own customer record (matched by email)
+      base = base.eq('email', req.user.email);
+    }
+
+    if (search) base = base.or(`name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
+    if (status) base = base.eq('status', status);
+    if (tier) base = base.eq('tier', tier);
 
     const from = (page - 1) * limit;
-    query = query.order('created_at', { ascending: false }).range(from, from + limit - 1);
+    base = base.order('created_at', { ascending: false }).range(from, from + limit - 1);
 
-    const { data, error, count } = await query;
+    const { data, error, count } = await base;
     if (error) throw error;
     res.json({ success: true, data, total: count });
   } catch (err) { next(err); }
@@ -30,9 +38,15 @@ exports.getById = async (req, res, next) => {
 exports.create = async (req, res, next) => {
   try {
     const { name, email, phone, city, gender, status, tier, risk_score, address, state, pincode } = req.body;
+
+    // Only Agents and Admins can create customers
+    if (!['Insurance Agent', 'Admin'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
     const { data, error } = await supabase.from('customers').insert({
       name, email, phone, city, gender, status: status || 'Active', tier: tier || 'Silver',
-      risk_score, address, state, pincode, avatar_url: `https://i.pravatar.cc/150?u=${Date.now()}`,
+      risk_score, address, state, pincode,
       created_by: req.user.id,
     }).select().single();
     if (error) throw error;

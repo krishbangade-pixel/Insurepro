@@ -52,12 +52,12 @@ exports.getDashboard = async (req, res, next) => {
     });
 
     const kpiStats = [
-      { id: 'total-customers', title: 'Total Customers', value: totalCustomers.toLocaleString(), change: '+12.5%', isPositive: true, subtitle: 'vs last 30 days', icon: 'Users', color: 'emerald' },
-      { id: 'active-policies', title: 'Active Policies', value: activePolicies.toLocaleString(), change: '+8.3%', isPositive: true, subtitle: 'vs last 30 days', icon: 'ShieldCheck', color: 'blue' },
-      { id: 'total-claims', title: 'Total Claims', value: totalClaims.toLocaleString(), change: '-4.2%', isPositive: false, subtitle: 'vs last 30 days', icon: 'FileText', color: 'purple' },
-      { id: 'premium-collected', title: 'Premium Collected', value: `$${premiumCollected.toLocaleString()}`, change: '+15.6%', isPositive: true, subtitle: 'vs last 30 days', icon: 'DollarSign', color: 'amber' },
-      { id: 'pending-claims', title: 'Pending Claims', value: pendingClaims.toString(), change: '+3.6%', isPositive: false, subtitle: 'vs last 30 days', icon: 'Hourglass', color: 'rose' },
-      { id: 'expiring-policies', title: 'Expiring Policies', value: expiringPolicies.toString(), change: '12.6%', isPositive: false, subtitle: 'next 30 days', icon: 'AlertTriangle', color: 'orange' },
+      { id: 'total-customers', title: 'Total Customers', value: totalCustomers.toLocaleString(), subtitle: 'All customer records', icon: 'Users', color: 'emerald' },
+      { id: 'active-policies', title: 'Active Policies', value: activePolicies.toLocaleString(), subtitle: 'Currently in force', icon: 'ShieldCheck', color: 'blue' },
+      { id: 'total-claims', title: 'Total Claims', value: totalClaims.toLocaleString(), subtitle: 'All submitted claims', icon: 'FileText', color: 'purple' },
+      { id: 'premium-collected', title: 'Premium Collected', value: `$${premiumCollected.toLocaleString()}`, subtitle: 'Recorded paid premiums', icon: 'DollarSign', color: 'amber' },
+      { id: 'pending-claims', title: 'Pending Claims', value: pendingClaims.toString(), subtitle: 'Awaiting a decision', icon: 'Hourglass', color: 'rose' },
+      { id: 'expiring-policies', title: 'Expiring Policies', value: expiringPolicies.toString(), subtitle: 'Marked as expiring soon', icon: 'AlertTriangle', color: 'orange' },
     ];
 
     // Monthly revenue data (aggregate from payments by month)
@@ -66,12 +66,12 @@ exports.getDashboard = async (req, res, next) => {
     const monthlyRevenue = months.slice(0, 6).map((month, idx) => {
       const monthPayments = (allPayments || []).filter(p => p.paid_date && new Date(p.paid_date).getMonth() === idx);
       const revenue = monthPayments.reduce((s, p) => s + Number(p.amount), 0);
-      return { month, revenue: revenue || (30000 + idx * 5000), target: 28000 + idx * 4000 };
+      return { month, revenue, target: 0 };
     });
 
     // Customer growth data
     const customerGrowth = months.slice(0, 6).map((month, idx) => ({
-      month, customers: Math.round(totalCustomers * (0.4 + idx * 0.12)),
+      month, customers: 0,
     }));
 
     res.json({
@@ -106,7 +106,7 @@ exports.getRevenue = async (req, res, next) => {
     const result = months.map((month, idx) => {
       const payments = (data || []).filter(p => p.paid_date && new Date(p.paid_date).getMonth() === idx);
       const revenue = payments.reduce((s, p) => s + Number(p.amount), 0);
-      return { month, revenue: revenue || (30000 + idx * 5000), target: 28000 + idx * 4000 };
+      return { month, revenue, target: 0 };
     });
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
@@ -115,7 +115,7 @@ exports.getRevenue = async (req, res, next) => {
 exports.getCustomerGrowth = async (req, res, next) => {
   try {
     const { count } = await supabase.from('customers').select('id', { count: 'exact' });
-    const total = count || 6;
+    const total = count || 0;
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
     const result = months.map((month, idx) => ({ month, customers: Math.round(total * (0.4 + idx * 0.12)) }));
     res.json({ success: true, data: result });
@@ -125,11 +125,11 @@ exports.getCustomerGrowth = async (req, res, next) => {
 exports.getClaimsOverview = async (req, res, next) => {
   try {
     const { data, count } = await supabase.from('claims').select('status', { count: 'exact' });
-    const total = count || 1;
+    const total = count || 0;
     const colors = { Approved: '#10B981', Pending: '#F59E0B', 'In Review': '#3B82F6', Rejected: '#EF4444' };
     const result = ['Approved', 'Pending', 'In Review', 'Rejected'].map(status => {
       const c = (data || []).filter(cl => cl.status === status).length;
-      return { name: status, value: c, percentage: `${((c / total) * 100).toFixed(1)}%`, color: colors[status] };
+      return { name: status, value: c, percentage: total ? `${((c / total) * 100).toFixed(1)}%` : '0%', color: colors[status] };
     });
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
