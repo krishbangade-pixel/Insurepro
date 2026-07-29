@@ -30,7 +30,7 @@ export function Navbar({ onMobileMenuToggle }) {
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Dynamic Page Title using profile name
-  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User';
+  const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
   const displayRole = profile?.role || user?.user_metadata?.role || 'User';
   const displayEmail = user?.email || '';
 

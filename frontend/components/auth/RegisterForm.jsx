@@ -20,7 +20,7 @@ const registerSchema = z
     fullName: z.string().min(2, 'Full name is required'),
     email: z.string().min(1, 'Email address is required').email('Invalid email address format'),
     gender: z.enum(['Male', 'Female'], { required_error: 'Please select a gender' }),
-    role: z.enum(['Customer', 'Insurance Agent'], { required_error: 'Please select a role' }),
+    role: z.enum(['Customer', 'Insurance Agent', 'Admin'], { required_error: 'Please select a role' }),
     password: z.string().min(8, 'Password must be at least 8 characters'),
     confirmPassword: z.string().min(8, 'Please confirm your password'),
     terms: z.literal(true, {
@@ -181,18 +181,18 @@ export function RegisterForm() {
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
             Select Your Role
           </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <button
               type="button"
               onClick={() => handleRoleChange('Customer')}
-              className={`p-3.5 rounded-2xl border text-left flex items-center space-x-3 transition-all cursor-pointer ${
+              className={`p-3 rounded-2xl border text-left flex items-center space-x-2.5 transition-all cursor-pointer ${
                 selectedRole === 'Customer'
                   ? 'bg-brand-50/40 dark:bg-brand-950/40 border-brand-500 ring-2 ring-brand-500/20'
                   : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 hover:border-slate-300'
               }`}
             >
               <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                   selectedRole === 'Customer'
                     ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-300'
                     : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
@@ -200,10 +200,10 @@ export function RegisterForm() {
               >
                 <User className="w-4 h-4" />
               </div>
-              <div>
-                <p className="text-xs font-bold text-slate-900 dark:text-white">Customer</p>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                  Manage your policies and claims
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-900 dark:text-white truncate">Customer</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight truncate">
+                  Policies & claims
                 </p>
               </div>
             </button>
@@ -211,14 +211,14 @@ export function RegisterForm() {
             <button
               type="button"
               onClick={() => handleRoleChange('Insurance Agent')}
-              className={`p-3.5 rounded-2xl border text-left flex items-center space-x-3 transition-all cursor-pointer ${
+              className={`p-3 rounded-2xl border text-left flex items-center space-x-2.5 transition-all cursor-pointer ${
                 selectedRole === 'Insurance Agent'
                   ? 'bg-brand-50/40 dark:bg-brand-950/40 border-brand-500 ring-2 ring-brand-500/20'
                   : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 hover:border-slate-300'
               }`}
             >
               <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                   selectedRole === 'Insurance Agent'
                     ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-300'
                     : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
@@ -226,10 +226,36 @@ export function RegisterForm() {
               >
                 <UserCheck className="w-4 h-4" />
               </div>
-              <div>
-                <p className="text-xs font-bold text-slate-900 dark:text-white">Insurance Agent</p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-400 leading-tight">
-                  Underwrite policies & manage clients
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-900 dark:text-white truncate">Agent</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight truncate">
+                  Manage clients
+                </p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleRoleChange('Admin')}
+              className={`p-3 rounded-2xl border text-left flex items-center space-x-2.5 transition-all cursor-pointer ${
+                selectedRole === 'Admin'
+                  ? 'bg-brand-50/40 dark:bg-brand-950/40 border-brand-500 ring-2 ring-brand-500/20'
+                  : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 hover:border-slate-300'
+              }`}
+            >
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                  selectedRole === 'Admin'
+                    ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-300'
+                    : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-900 dark:text-white truncate">Admin</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight truncate">
+                  System oversight
                 </p>
               </div>
             </button>

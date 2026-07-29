@@ -90,9 +90,9 @@ export default function CustomerDetailsPage() {
               </div>
               <p className="text-xs text-slate-500 font-mono">Customer ID: {customer?.id}</p>
               <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-1">
-                <span className="flex items-center"><Mail className="w-3.5 h-3.5 mr-1" />{customer.email}</span>
-                <span className="flex items-center"><Phone className="w-3.5 h-3.5 mr-1" />{customer.phone}</span>
-                <span className="flex items-center"><MapPin className="w-3.5 h-3.5 mr-1" />{customer.city}</span>
+                <span className="flex items-center"><Mail className="w-3.5 h-3.5 mr-1" />{customer?.email}</span>
+                <span className="flex items-center"><Phone className="w-3.5 h-3.5 mr-1" />{customer?.phone || '-'}</span>
+                <span className="flex items-center"><MapPin className="w-3.5 h-3.5 mr-1" />{customer?.city || '-'}</span>
               </div>
             </div>
           </div>
@@ -110,20 +110,22 @@ export default function CustomerDetailsPage() {
         {/* Stats Metrics Sub-Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
           <div>
-                <p className="text-xs text-slate-500">Active Policies</p>
+            <p className="text-xs text-slate-500">Active Policies</p>
             <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">{customerPolicies.length}</p>
           </div>
           <div>
             <p className="text-xs text-slate-500">Total Premiums Paid</p>
-            <p className="text-lg font-bold text-brand-600 dark:text-brand-400 mt-0.5">{customer?.totalPremiums || '-'}</p>
+            <p className="text-lg font-bold text-brand-600 dark:text-brand-400 mt-0.5">{customer?.total_premiums ? `$${customer.total_premiums}` : '-'}</p>
           </div>
           <div>
             <p className="text-xs text-slate-500">Underwriting Risk Score</p>
-            <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">{customer.riskScore}</p>
+            <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">{customer?.risk_score || 'N/A'}</p>
           </div>
           <div>
             <p className="text-xs text-slate-500">Member Since</p>
-            <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">{customer.joinedDate}</p>
+            <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
+              {customer?.created_at ? new Date(customer.created_at).toLocaleDateString() : '-'}
+            </p>
           </div>
         </div>
       </Card>

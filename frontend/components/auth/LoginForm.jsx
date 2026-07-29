@@ -47,19 +47,19 @@ export function LoginForm() {
         password: data.password,
       });
 
-      const role = result.user?.user_metadata?.role || 'Customer';
-      toast.success(`Successfully signed in as ${role}`);
+      const userRole = result.user?.user_metadata?.role || result.profile?.role || 'Customer';
+      toast.success(`Successfully signed in!`);
 
       setTimeout(() => {
         setIsLoading(false);
-        if (role === 'Admin') {
+        if (userRole === 'Admin') {
           router.push('/dashboard');
-        } else if (role === 'Insurance Agent') {
+        } else if (userRole === 'Insurance Agent' || userRole === 'Agent') {
           router.push('/agent/dashboard');
         } else {
           router.push('/customer/dashboard');
         }
-      }, 600);
+      }, 500);
     } catch (error) {
       setIsLoading(false);
       toast.error(error.message || 'Login failed. Please check your credentials.');
@@ -75,7 +75,7 @@ export function LoginForm() {
             Welcome Back
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Sign in to access your InsurePro portal.
+            Sign in to access your InsurePro account.
           </p>
         </div>
 
@@ -124,7 +124,7 @@ export function LoginForm() {
           rightIcon={ArrowRight}
           className="w-full mt-2 bg-brand-600 hover:bg-brand-700 py-3 text-sm font-bold shadow-md"
         >
-          Sign In to Portal
+          Sign In
         </Button>
       </form>
 

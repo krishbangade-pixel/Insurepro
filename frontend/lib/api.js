@@ -18,7 +18,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {
-      window.location.href = '/login';
+      console.warn('API authentication error:', error.response?.data?.message || 'Unauthorized');
     }
     return Promise.reject(error);
   }

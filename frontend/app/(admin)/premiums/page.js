@@ -54,21 +54,22 @@ export default function PremiumsPage() {
     return true;
   });
 
-  const handleRecordPayment = (e) => {
+  const handleRecordPayment = async (e) => {
     e.preventDefault();
-    const created = {
-      invoiceId: `INV-${Math.floor(9000 + Math.random() * 1000)}`,
-      policyNumber: payForm.policyNumber,
-      customer: payForm.customer,
-      amount: `$${parseFloat(payForm.amount).toFixed(2)}`,
-      paymentMethod: payForm.method,
-      dueDate: 'Jun 30, 2025',
-      paidDate: 'Just now',
-      status: 'Paid',
-    };
-    setPremiums([created, ...premiums]);
-    setIsRecordOpen(false);
-    toast.success(`Payment of ${created.amount} recorded for invoice ${created.invoiceId}`);
+    try {
+      const res = await api.post('/payments', {
+        amount: Number(payForm.amount),
+        payment_method: payForm.method,
+        payment_status: 'Paid',
+        paid_date: new Date().toISOString(),
+      });
+      const created = mapPayment(res.data.data);
+      setPremiums([created, ...premiums]);
+      setIsRecordOpen(false);
+      toast.success(`Payment of ${created.amount} recorded for invoice ${created.invoiceId}`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message);
+    }
   };
 
   const columns = [

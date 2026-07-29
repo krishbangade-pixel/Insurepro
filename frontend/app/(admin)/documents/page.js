@@ -11,12 +11,15 @@ import {
   CheckCircle,
   Clock,
   Plus,
+  Upload,
 } from 'lucide-react';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs } from '@/components/ui/Tabs';
 import { Modal } from '@/components/ui/Modal';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import { mapDocument } from '@/lib/mappers';
@@ -24,15 +27,27 @@ import { PageLoader, PageError, EmptyState } from '@/components/common/PageState
 
 export default function DocumentsPage() {
   const [docs, setDocs] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeCategory, setActiveCategory] = useState('All');
   const [previewDoc, setPreviewDoc] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const [uploadForm, setUploadForm] = useState({
+    name: '',
+    category: 'Policy Agreements',
+    customer_id: '',
+    file: null,
+  });
 
   useEffect(() => {
-    api.get('/documents')
-      .then((res) => setDocs((res.data.data || []).map(mapDocument)))
+    Promise.all([api.get('/documents'), api.get('/customers')])
+      .then(([docRes, custRes]) => {
+        setDocs((docRes.data.data || []).map(mapDocument));
+        setCustomers(custRes.data.data || []);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
@@ -41,23 +56,38 @@ export default function DocumentsPage() {
     ? docs
     : docs.filter((d) => d.category === activeCategory);
 
-  const handleDropUpload = (e) => {
+  const handleUploadSubmit = async (e) => {
     e.preventDefault();
-    setIsUploading(true);
-    setTimeout(() => {
-      const created = {
-        id: `DOC-${Math.floor(100 + Math.random() * 900)}`,
-        name: 'Signed_Policy_Endorsement_2025.pdf',
-        category: 'Policy Agreements',
-        size: '3.1 MB',
-        uploadedOn: 'Just now',
-        uploadedBy: 'Alex Johnson',
-        status: 'Verified',
-      };
-      setDocs([created, ...docs]);
-      setIsUploading(false);
-      toast.success('Document uploaded and scanned for viruses.');
-    }, 1000);
+    if (!uploadForm.name.trim()) {
+      toast.error('Document title is required');
+      return;
+    }
+    setUploading(true);
+    try {
+      const fileName = uploadForm.file ? uploadForm.file.name : `${uploadForm.name.replace(/\s+/g, '_')}.pdf`;
+      const fileSize = uploadForm.file ? `${(uploadForm.file.size / (1024 * 1024)).toFixed(2)} MB` : '1.50 MB';
+      const fileType = uploadForm.file ? uploadForm.file.type : 'application/pdf';
+
+      const res = await api.post('/documents', {
+        name: uploadForm.name.trim(),
+        category: uploadForm.category,
+        size: fileSize,
+        customer_id: uploadForm.customer_id || null,
+        file_name: fileName,
+        file_type: fileType,
+        file_path: `/uploads/${fileName}`,
+      });
+
+      const newDoc = mapDocument(res.data.data);
+      setDocs([newDoc, ...docs]);
+      setIsUploadModalOpen(false);
+      setUploadForm({ name: '', category: 'Policy Agreements', customer_id: '', file: null });
+      toast.success(`Document "${uploadForm.name}" uploaded to repository successfully!`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleDelete = async (id, name) => {
@@ -83,21 +113,23 @@ export default function DocumentsPage() {
             Store, categorize, verify, and inspect policy agreements, medical records, and claim proof documents.
           </p>
         </div>
+
+        <Button variant="primary" leftIcon={Plus} onClick={() => setIsUploadModalOpen(true)}>
+          Upload New Document
+        </Button>
       </div>
 
       {/* Drag & Drop Upload Zone */}
       <Card
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={handleDropUpload}
         className="p-8 border-2 border-dashed border-brand-500/40 hover:border-brand-500 bg-brand-50/20 dark:bg-brand-950/20 text-center space-y-3 transition-colors cursor-pointer"
-        onClick={handleDropUpload}
+        onClick={() => setIsUploadModalOpen(true)}
       >
         <div className="w-14 h-14 mx-auto rounded-2xl bg-brand-100 text-brand-600 dark:bg-brand-900/60 dark:text-brand-300 flex items-center justify-center">
           <UploadCloud className="w-7 h-7" />
         </div>
         <div>
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-            {isUploading ? 'Uploading and Indexing File...' : 'Drag & drop files here, or click to browse'}
+            Click here or drop files to upload to Document Vault
           </h3>
           <p className="text-xs text-slate-400 mt-1">
             Supports PDF, ZIP, PNG, JPG up to 50MB per file. Automatic OCR & virus scanning enabled.
@@ -180,6 +212,61 @@ export default function DocumentsPage() {
         </div>
         )}
       </Card>
+
+      {/* Upload Document Modal */}
+      <Modal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        title="Upload Document"
+        subtitle="Add a new policy, medical report, or compliance file into Supabase"
+      >
+        <form onSubmit={handleUploadSubmit} className="space-y-4">
+          <Input
+            label="Document Title"
+            placeholder="e.g. Executive Health Policy Schedule 2026.pdf"
+            value={uploadForm.name}
+            onChange={(e) => setUploadForm({ ...uploadForm, name: e.target.value })}
+            required
+          />
+          <Select
+            label="Document Category"
+            options={[
+              'Policy Agreements',
+              'Medical Reports',
+              'Claim Proofs',
+              'Identification',
+              'Other',
+            ]}
+            value={uploadForm.category}
+            onChange={(e) => setUploadForm({ ...uploadForm, category: e.target.value })}
+          />
+          <Select
+            label="Associated Customer (Optional)"
+            options={[{ label: 'General / No Customer', value: '' }, ...customers.map((c) => ({ label: `${c.name} — ${c.email}`, value: c.id }))]}
+            value={uploadForm.customer_id}
+            onChange={(e) => setUploadForm({ ...uploadForm, customer_id: e.target.value })}
+          />
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+              Select Document File
+            </label>
+            <input
+              type="file"
+              onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files[0] })}
+              className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 cursor-pointer border border-slate-200 dark:border-slate-800 rounded-xl p-1"
+            />
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button variant="outline" type="button" onClick={() => setIsUploadModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit" isLoading={uploading} leftIcon={Upload}>
+              Upload to Vault
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Preview Modal */}
       <Modal

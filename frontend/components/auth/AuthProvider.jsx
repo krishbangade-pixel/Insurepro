@@ -75,6 +75,7 @@ export function AuthProvider({ children }) {
 
   // Sign up with email and password
   const signUp = async ({ email, password, fullName, gender, role }) => {
+    const selectedRole = role || 'Customer';
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -82,12 +83,51 @@ export function AuthProvider({ children }) {
         data: {
           full_name: fullName,
           gender,
-          role: role || 'Customer',
+          role: selectedRole,
         },
       },
     });
 
     if (error) throw error;
+
+    if (data?.user) {
+      try {
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          full_name: fullName,
+          role: selectedRole,
+          email: email,
+        });
+
+        if (selectedRole === 'Customer') {
+          await supabase.from('customers').upsert({
+            name: fullName,
+            email: email,
+            gender: gender || 'Not specified',
+            status: 'Active',
+            tier: 'Silver',
+          });
+        }
+
+        if (selectedRole === 'Insurance Agent') {
+          await supabase.from('agents').upsert({
+            employee_code: `AGT-${String(Math.floor(10 + Math.random() * 90))}`,
+            name: fullName,
+            email: email,
+            role: 'Insurance Agent',
+            designation: 'Insurance Underwriter',
+            assigned_customers: 0,
+            active_policies: 0,
+            claim_resolution_rate: '100%',
+            revenue_generated: '$0',
+            status: 'Active',
+          });
+        }
+      } catch (e) {
+        console.warn('Post-signup table record creation warning:', e.message);
+      }
+    }
+
     return data;
   };
 

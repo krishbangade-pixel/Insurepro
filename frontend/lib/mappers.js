@@ -55,7 +55,7 @@ export function mapPolicy(p) {
     startDate: formatDate(p.start_date),
     endDate: formatDate(p.end_date),
     status: p.status,
-    agent: p.agent?.name || 'Unassigned',
+    agent: p.agent?.full_name || p.agent?.name || 'Unassigned',
   };
 }
 

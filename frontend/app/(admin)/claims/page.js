@@ -51,20 +51,22 @@ export default function ClaimsPage() {
   }, []);
 
   const handleApprove = async (claim) => {
+    const targetId = claim._id || claim.id;
     try {
-      await api.put(`/claims/${claim._id}/approve`);
-      setClaims(claims.map((c) => (c._id === claim._id ? { ...c, status: 'Approved' } : c)));
-      toast.success(`Claim ${claim.id} approved for disbursement!`);
+      await api.put(`/claims/${targetId}/approve`);
+      setClaims(claims.map((c) => (c._id === targetId || c.id === targetId ? { ...c, status: 'Approved' } : c)));
+      toast.success(`Claim ${claim.id || targetId} approved for disbursement!`);
     } catch (err) {
       toast.error(err.response?.data?.message || err.message);
     }
   };
 
   const handleReject = async (claim) => {
+    const targetId = claim._id || claim.id;
     try {
-      await api.put(`/claims/${claim._id}/reject`);
-      setClaims(claims.map((c) => (c._id === claim._id ? { ...c, status: 'Rejected' } : c)));
-      toast.error(`Claim ${claim.id} rejected.`);
+      await api.put(`/claims/${targetId}/reject`);
+      setClaims(claims.map((c) => (c._id === targetId || c.id === targetId ? { ...c, status: 'Rejected' } : c)));
+      toast.error(`Claim ${claim.id || targetId} rejected.`);
     } catch (err) {
       toast.error(err.response?.data?.message || err.message);
     }

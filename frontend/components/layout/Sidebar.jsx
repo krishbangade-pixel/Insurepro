@@ -24,13 +24,18 @@ import {
   Home,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile }) {
   const pathname = usePathname();
+  const { user, profile } = useAuth();
 
   // Determine current role based on URL route
   const isAgent = pathname.startsWith('/agent');
   const isCustomer = pathname.startsWith('/customer');
+
+  const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
+  const displayRole = profile?.role || user?.user_metadata?.role || (isAgent ? 'Insurance Agent' : isCustomer ? 'Customer' : 'Admin');
 
   // Menu configurations for each role
   const adminSections = [
@@ -48,16 +53,11 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
     {
       title: 'MANAGEMENT',
       items: [
-        { name: 'Agents', href: '/agents', icon: UserCheck },
-        { name: 'Reports', href: '/reports', icon: BarChart3 },
-        { name: 'Notifications', href: '/notifications', icon: Bell, badge: '8' },
-      ],
-    },
-    {
-      title: 'SYSTEM',
-      items: [
-        { name: 'Settings', href: '/settings', icon: Settings },
+        { name: 'Agents Roster', href: '/agents', icon: UserCheck },
+        { name: 'Analytics & Reports', href: '/reports', icon: BarChart3 },
+        { name: 'Notifications', href: '/notifications', icon: Bell },
         { name: 'Audit Logs', href: '/audit-logs', icon: History },
+        { name: 'Settings', href: '/settings', icon: Settings },
       ],
     },
   ];
@@ -67,8 +67,14 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
       title: 'AGENT PORTAL',
       items: [
         { name: 'Agent Dashboard', href: '/agent/dashboard', icon: LayoutDashboard },
+        { name: 'Policies & Issuance', href: '/policies', icon: FileCheck },
         { name: 'Assigned Customers', href: '/agent/customers', icon: Users },
         { name: 'Assigned Claims', href: '/agent/claims', icon: FileText },
+      ],
+    },
+    {
+      title: 'ACCOUNT',
+      items: [
         { name: 'My Profile', href: '/agent/profile', icon: User },
       ],
     },
@@ -76,12 +82,12 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
 
   const customerSections = [
     {
-      title: 'CUSTOMER PORTAL',
+      title: 'MY INSUREPRO',
       items: [
-        { name: 'Overview', href: '/customer/dashboard', icon: Home },
+        { name: 'Dashboard', href: '/customer/dashboard', icon: LayoutDashboard },
         { name: 'My Policies', href: '/customer/policies', icon: FileCheck },
-        { name: 'Premium Payments', href: '/customer/premiums', icon: DollarSign },
-        { name: 'Claims Self-Service', href: '/customer/claims', icon: FileText },
+        { name: 'My Claims', href: '/customer/claims', icon: FileText },
+        { name: 'Premiums & Billing', href: '/customer/premiums', icon: DollarSign },
         { name: 'Documents Vault', href: '/customer/documents', icon: FolderOpen },
       ],
     },
@@ -95,23 +101,11 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
 
   const menuSections = isAgent ? agentSections : isCustomer ? customerSections : adminSections;
 
-  const userProfile = isAgent
-    ? {
-        name: 'Marcus Vance',
-        role: 'Claims Specialist Lead',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=120',
-      }
-    : isCustomer
-    ? {
-        name: 'John Smith',
-        role: 'Platinum Policyholder',
-        avatar: 'https://i.pravatar.cc/150?u=johnsmith',
-      }
-    : {
-        name: 'Alex Johnson',
-        role: 'Administrator',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120',
-      };
+  const userProfile = {
+    name: displayName,
+    role: displayRole,
+    initial: displayName.charAt(0).toUpperCase(),
+  };
 
   return (
     <>
@@ -206,11 +200,9 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
           {!isCollapsed ? (
             <div className="p-2.5 rounded-2xl bg-sidebar-hover/60 flex items-center justify-between">
               <div className="flex items-center space-x-3 min-w-0">
-                <img
-                  src={userProfile.avatar}
-                  alt={userProfile.name}
-                  className="w-9 h-9 rounded-xl object-cover ring-2 ring-emerald-400/40"
-                />
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white font-bold text-xs flex items-center justify-center ring-2 ring-emerald-400/40 shrink-0">
+                  {userProfile.initial}
+                </div>
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-white truncate">
                     {userProfile.name}
@@ -226,11 +218,9 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
             </div>
           ) : (
             <div className="flex justify-center">
-              <img
-                src={userProfile.avatar}
-                alt={userProfile.name}
-                className="w-9 h-9 rounded-xl object-cover ring-2 ring-emerald-400/40"
-              />
+              <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white font-bold text-xs flex items-center justify-center ring-2 ring-emerald-400/40 shrink-0">
+                {userProfile.initial}
+              </div>
             </div>
           )}
 

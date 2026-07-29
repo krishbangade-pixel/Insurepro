@@ -20,7 +20,7 @@ export default function AgentClaimsPage() {
   const columns = [
     { header: 'Claim ID', accessorKey: 'claim_number' },
     { header: 'Customer', accessorKey: 'customer', cell: (r) => r.customer?.name },
-    { header: 'Amount', accessorKey: 'amount' },
+    { header: 'Amount', accessorKey: 'claim_amount', cell: (r) => `$${Number(r.claim_amount || 0).toLocaleString()}` },
     { header: 'Status', accessorKey: 'status', cell: (r) => <Badge variant="warning">{r.status}</Badge> },
   ];
 

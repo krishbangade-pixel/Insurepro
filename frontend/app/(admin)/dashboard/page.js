@@ -28,7 +28,7 @@ import { Select } from '@/components/ui/Select';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { deriveClaimsByCategory } from '@/lib/mappers';
+import { mapCustomer, mapAgent, deriveClaimsByCategory } from '@/lib/mappers';
 import { PageLoader, PageError } from '@/components/common/PageState';
 import {
   BarChart,
@@ -59,6 +59,8 @@ export default function AdminDashboard() {
   const [policyStatusDistribution, setPolicyStatusDistribution] = useState([]);
   const [recentNotificationsData, setRecentNotificationsData] = useState([]);
   const [claimsByCategoryData, setClaimsByCategoryData] = useState([]);
+  const [registeredCustomers, setRegisteredCustomers] = useState([]);
+  const [registeredAgents, setRegisteredAgents] = useState([]);
 
   // Form states for Quick Actions (must be declared before any early return)
   const [customerName, setCustomerName] = useState('');
@@ -82,6 +84,13 @@ export default function AdminDashboard() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+
+    Promise.all([api.get('/customers'), api.get('/agents')])
+      .then(([custRes, agentRes]) => {
+        setRegisteredCustomers((custRes.data.data || []).map(mapCustomer));
+        setRegisteredAgents((agentRes.data.data || []).map(mapAgent));
+      })
+      .catch(() => {});
   }, []);
 
   const totalClaims = claimsOverviewData.reduce((s, c) => s + (c.value || 0), 0);
@@ -91,9 +100,37 @@ export default function AdminDashboard() {
 
 
 
-  const handleQuickSubmit = (title) => {
-    setActiveModal(null);
-    toast.success(`${title} processed successfully!`);
+  const handleAddCustomerQuick = async () => {
+    try {
+      await api.post('/customers', { name: customerName || 'New Customer', email: customerEmail || `customer_${Date.now()}@example.com` });
+      setActiveModal(null);
+      setCustomerName('');
+      setCustomerEmail('');
+      toast.success('Customer added successfully!');
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message);
+    }
+  };
+
+  const handleCreatePolicyQuick = async () => {
+    try {
+      toast.success('Policy issue flow opened under Policies page');
+      router.push('/policies');
+      setActiveModal(null);
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message);
+    }
+  };
+
+  const handleNewClaimQuick = async () => {
+    try {
+      await api.post('/claims', { claim_amount: Number(claimAmount) || 5000, description: 'Submitted via quick actions' });
+      setActiveModal(null);
+      setClaimAmount('');
+      toast.success('Claim submitted successfully!');
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message);
+    }
   };
 
   return (
@@ -396,6 +433,101 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* Registered Accounts Overview Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Registered Customers Card */}
+        <Card className="p-5">
+          <CardHeader
+            title="Registered Customers"
+            subtitle={`${registeredCustomers.length} total active customer accounts`}
+            action={
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/customers')}
+                className="text-xs text-brand-600 dark:text-brand-400 font-semibold"
+              >
+                View Directory →
+              </Button>
+            }
+          />
+          <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+            {registeredCustomers.length === 0 ? (
+              <p className="text-xs text-slate-400">No registered customers found.</p>
+            ) : (
+              registeredCustomers.map((cust) => (
+                <div
+                  key={cust.id}
+                  className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 font-bold text-xs flex items-center justify-center">
+                      {(cust.name || 'C')[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 dark:text-white leading-snug">
+                        {cust.name}
+                      </p>
+                      <p className="text-[10px] text-slate-400">{cust.email}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <Badge variant={cust.status === 'Active' ? 'success' : 'neutral'}>{cust.status || 'Active'}</Badge>
+                    <span className="block text-[10px] font-bold text-slate-400 mt-0.5">{cust.tier} Tier</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </Card>
+
+        {/* Registered Agents Card */}
+        <Card className="p-5">
+          <CardHeader
+            title="Registered Agents & Underwriters"
+            subtitle={`${registeredAgents.length} active agent accounts`}
+            action={
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/agents')}
+                className="text-xs text-brand-600 dark:text-brand-400 font-semibold"
+              >
+                View Roster →
+              </Button>
+            }
+          />
+          <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+            {registeredAgents.length === 0 ? (
+              <p className="text-xs text-slate-400">No registered agents found.</p>
+            ) : (
+              registeredAgents.map((agent) => (
+                <div
+                  key={agent.id}
+                  className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-600 font-bold text-xs flex items-center justify-center">
+                      {(agent.name || 'A')[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 dark:text-white leading-snug">
+                        {agent.name}
+                      </p>
+                      <p className="text-[10px] text-slate-400">{agent.email}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <Badge variant="success">{agent.status || 'Active'}</Badge>
+                    <span className="block text-[10px] font-bold text-slate-400 mt-0.5">{agent.role}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </Card>
+      </div>
+
       {/* Bottom Analytics Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Top Policy Types Progress */}
@@ -492,7 +624,7 @@ export default function AdminDashboard() {
           />
           <div className="flex justify-end space-x-2 pt-4">
             <Button variant="outline" onClick={() => setActiveModal(null)}>Cancel</Button>
-            <Button variant="primary" onClick={() => handleQuickSubmit('Customer')}>Save Customer</Button>
+            <Button variant="primary" onClick={handleAddCustomerQuick}>Save Customer</Button>
           </div>
         </div>
       </Modal>
@@ -514,7 +646,7 @@ export default function AdminDashboard() {
           <Input label="Annual Coverage Limit ($)" placeholder="e.g. 500,000" />
           <div className="flex justify-end space-x-2 pt-4">
             <Button variant="outline" onClick={() => setActiveModal(null)}>Cancel</Button>
-            <Button variant="primary" onClick={() => handleQuickSubmit('Policy')}>Create Policy</Button>
+            <Button variant="primary" onClick={handleCreatePolicyQuick}>Go to Policy Creation</Button>
           </div>
         </div>
       </Modal>
@@ -535,7 +667,7 @@ export default function AdminDashboard() {
           />
           <div className="flex justify-end space-x-2 pt-4">
             <Button variant="outline" onClick={() => setActiveModal(null)}>Cancel</Button>
-            <Button variant="primary" onClick={() => handleQuickSubmit('Claim')}>Submit Claim</Button>
+            <Button variant="primary" onClick={handleNewClaimQuick}>Submit Claim</Button>
           </div>
         </div>
       </Modal>

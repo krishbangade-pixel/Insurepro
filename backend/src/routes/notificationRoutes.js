@@ -4,7 +4,7 @@ const auth = require('../middleware/auth');
 
 router.use(auth);
 router.get('/', ctrl.getAll);
-router.put('/:id/read', ctrl.markRead);
 router.put('/read-all', ctrl.markAllRead);
+router.put('/:id/read', ctrl.markRead);
 
 module.exports = router;
