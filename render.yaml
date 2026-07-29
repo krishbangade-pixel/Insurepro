@@ -1,0 +1,39 @@
+# ============================================================
+# InsurePro Backend — render.yaml
+# Infrastructure as Code for Render deployment
+# Docs: https://render.com/docs/infrastructure-as-code
+# ============================================================
+
+services:
+  - type: web
+    name: insurepro-api
+    runtime: node
+    region: singapore          # Closest to ap-south-1 Supabase region
+    plan: free                  # Change to "starter" for always-on
+    rootDir: backend            # backend folder within the repo
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+
+    # Auto-deploy on every push to main branch
+    autoDeploy: true
+
+    envVars:
+      # Supabase
+      - key: SUPABASE_URL
+        sync: false             # Set manually in Render dashboard
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # Server
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000            # Render assigns its own port; this is a default
+
+      # CORS — set to your Vercel frontend URL after deploying
+      # Example: https://insurepro.vercel.app,https://your-custom-domain.com
+      - key: CORS_ORIGIN
+        sync: false
