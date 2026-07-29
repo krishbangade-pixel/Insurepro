@@ -65,16 +65,27 @@ export function mapClaim(c) {
     _id: c.id,
     customerId: c.customer_id,
     policyNumber: c.policy?.policy_number,
+    policyPlan: c.policy?.plan_name,
     customer: {
       name: c.customer?.name,
       email: c.customer?.email,
       avatar: c.customer?.avatar_url,
     },
+    agentName: c.agent?.name || null,
+    agentEmail: c.agent?.email || null,
+    agentId: c.agent_id || null,
     claimAmount: formatCurrency(c.claim_amount),
+    claimAmountRaw: Number(c.claim_amount || 0),
     status: c.status,
     submittedOn: formatDate(c.submission_date),
     priority: c.priority,
-    type: c.policy?.policy_type?.name || c.claim_type,
+    claimType: c.claim_type || 'General',
+    type: c.policy?.policy_type?.name || c.claim_type || 'General',
+    description: c.description || c.reason || '',
+    // Review fields
+    reviewComment: c.review_comment || null,
+    reviewedAt: c.reviewed_at ? formatDate(c.reviewed_at) : null,
+    reviewedBy: c.reviewed_by || null,
   };
 }
 

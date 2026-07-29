@@ -325,3 +325,77 @@ CREATE TRIGGER set_timestamp_policies BEFORE UPDATE ON policies FOR EACH ROW EXE
 
 DROP TRIGGER IF EXISTS set_timestamp_claims ON claims;
 CREATE TRIGGER set_timestamp_claims BEFORE UPDATE ON claims FOR EACH ROW EXECUTE PROCEDURE update_timestamp();
+
+-- ============================================================
+-- Claims Workflow Migration v2 (Claim Review Workflow)
+-- Applied: 2026-07-29 — Run in Supabase SQL Editor if not done
+-- ============================================================
+
+-- Ensure claims workflow columns exist
+ALTER TABLE claims ADD COLUMN IF NOT EXISTS agent_id uuid REFERENCES agents(id) ON DELETE SET NULL;
+ALTER TABLE claims ADD COLUMN IF NOT EXISTS review_comment text;
+ALTER TABLE claims ADD COLUMN IF NOT EXISTS reason text;
+ALTER TABLE claims ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone DEFAULT now();
+-- Ensure FK constraint exists (needed for Supabase PostgREST joins)
+ALTER TABLE claims DROP CONSTRAINT IF EXISTS claims_agent_id_fkey;
+ALTER TABLE claims ADD CONSTRAINT claims_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE SET NULL;
+
+-- Helper: current user role lookup
+CREATE OR REPLACE FUNCTION public.current_user_role()
+RETURNS text AS $$
+BEGIN
+  RETURN (SELECT role FROM public.profiles WHERE id = auth.uid());
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- Drop any permissive blanket policies on claims
+DROP POLICY IF EXISTS allow_auth_select ON claims;
+DROP POLICY IF EXISTS allow_auth_insert ON claims;
+DROP POLICY IF EXISTS allow_auth_update ON claims;
+DROP POLICY IF EXISTS claims_select_admin ON claims;
+DROP POLICY IF EXISTS claims_select_agent ON claims;
+DROP POLICY IF EXISTS claims_select_customer ON claims;
+DROP POLICY IF EXISTS claims_insert_customer ON claims;
+DROP POLICY IF EXISTS claims_update_admin ON claims;
+DROP POLICY IF EXISTS claims_update_agent ON claims;
+
+ALTER TABLE claims ENABLE ROW LEVEL SECURITY;
+
+-- Admin: full access
+CREATE POLICY claims_select_admin ON claims
+  FOR SELECT USING (public.current_user_role() = 'Admin');
+
+-- Agent: only see claims assigned to them (agents.user_id = auth.uid())
+CREATE POLICY claims_select_agent ON claims
+  FOR SELECT USING (
+    public.current_user_role() = 'Insurance Agent'
+    AND agent_id IN (SELECT id FROM public.agents WHERE user_id = auth.uid())
+  );
+
+-- Customer: only their own claims
+CREATE POLICY claims_select_customer ON claims
+  FOR SELECT USING (
+    public.current_user_role() = 'Customer'
+    AND customer_id IN (
+      SELECT id FROM public.customers
+      WHERE email = (SELECT email FROM public.profiles WHERE id = auth.uid())
+    )
+  );
+
+-- INSERT: customers, agents, and admins may create claims
+CREATE POLICY claims_insert_customer ON claims
+  FOR INSERT WITH CHECK (
+    public.current_user_role() IN ('Customer', 'Insurance Agent', 'Admin')
+  );
+
+-- UPDATE: Admin can update any claim; agents can only update their assigned claims
+CREATE POLICY claims_update_admin ON claims
+  FOR UPDATE USING (public.current_user_role() = 'Admin');
+
+CREATE POLICY claims_update_agent ON claims
+  FOR UPDATE USING (
+    public.current_user_role() = 'Insurance Agent'
+    AND agent_id IN (SELECT id FROM public.agents WHERE user_id = auth.uid())
+  );
+-- NOTE: No UPDATE policy for 'Customer' role — denied by RLS + enforced at backend level
+

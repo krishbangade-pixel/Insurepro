@@ -67,7 +67,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
       title: 'AGENT PORTAL',
       items: [
         { name: 'Agent Dashboard', href: '/agent/dashboard', icon: LayoutDashboard },
-        { name: 'Policies & Issuance', href: '/policies', icon: FileCheck },
+        { name: 'Policies & Issuance', href: '/agent/policies', icon: FileCheck },
         { name: 'Assigned Customers', href: '/agent/customers', icon: Users },
         { name: 'Assigned Claims', href: '/agent/claims', icon: FileText },
       ],
@@ -154,7 +154,9 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
                 </p>
               )}
               {section.items.map((item) => {
-                const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href + '/'));
+                const isActive =
+                  pathname === item.href ||
+                  (item.href.length > 1 && pathname.startsWith(item.href + '/'));
                 const Icon = item.icon;
 
                 return (

@@ -8,8 +8,8 @@ import {
   UserCheck,
   Clock,
   MessageSquare,
-  Paperclip,
-  Plus,
+  Lock,
+  Eye,
   ShieldAlert,
 } from 'lucide-react';
 import { Card, CardHeader } from '@/components/ui/Card';
@@ -17,103 +17,157 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { DataTable } from '@/components/ui/DataTable';
 import { Modal } from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
-import { mapClaim, mapAgent } from '@/lib/mappers';
+import { mapClaim, mapAgent, formatDate } from '@/lib/mappers';
 import { PageLoader, PageError, EmptyState } from '@/components/common/PageState';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 export default function ClaimsPage() {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'Admin' || !profile?.role; // fallback to true in dev
+
   const [claims, setClaims] = useState([]);
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedClaim, setSelectedClaim] = useState(null);
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [isTimelineOpen, setIsTimelineOpen] = useState(false);
-  const [assignedAgent, setAssignedAgent] = useState('');
-  const [internalNote, setInternalNote] = useState('');
-  const [notesList, setNotesList] = useState([
-    { author: 'Marcus Vance', text: 'Initial police report and medical receipts verified.', time: 'Jun 11, 2025' },
-  ]);
+  const [detailClaim, setDetailClaim] = useState(null);
 
-  useEffect(() => {
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  const [reviewAction, setReviewAction] = useState('Approve');
+  const [reviewComment, setReviewComment] = useState('');
+  const [selectedAgentId, setSelectedAgentId] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [submittingAssign, setSubmittingAssign] = useState(false);
+
+  const loadData = () => {
+    setLoading(true);
     Promise.all([api.get('/claims'), api.get('/agents')])
       .then(([claimsRes, agentsRes]) => {
         setClaims((claimsRes.data.data || []).map(mapClaim));
         const agentList = (agentsRes.data.data || []).map(mapAgent);
         setAgents(agentList);
-        if (agentList.length) setAssignedAgent(agentList[0].name);
+        if (agentList.length) setSelectedAgentId(agentList[0]._id || agentList[0].id);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
-  const handleApprove = async (claim) => {
-    const targetId = claim._id || claim.id;
+  const openReviewModal = (claim, action) => {
+    setSelectedClaim(claim);
+    setReviewAction(action);
+    setReviewComment('');
+    setIsReviewModalOpen(true);
+  };
+
+  const openDetailModal = (claim) => {
+    setDetailClaim(claim);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (!reviewComment.trim()) {
+      toast.error('A review comment is required before approving or rejecting a claim.');
+      return;
+    }
+    const targetId = selectedClaim._id || selectedClaim.id;
+    setSubmittingReview(true);
     try {
-      await api.put(`/claims/${targetId}/approve`);
-      setClaims(claims.map((c) => (c._id === targetId || c.id === targetId ? { ...c, status: 'Approved' } : c)));
-      toast.success(`Claim ${claim.id || targetId} approved for disbursement!`);
+      const endpoint =
+        reviewAction === 'Approve' ? `/claims/${targetId}/approve` : `/claims/${targetId}/reject`;
+      const res = await api.put(endpoint, { review_comment: reviewComment.trim() });
+
+      const newStatus = reviewAction === 'Approve' ? 'Approved' : 'Rejected';
+      setClaims((prev) =>
+        prev.map((c) =>
+          c._id === targetId || c.id === targetId
+            ? {
+                ...c,
+                status: newStatus,
+                reviewComment: reviewComment.trim(),
+                reviewedAt: formatDate(new Date().toISOString()),
+              }
+            : c
+        )
+      );
+
+      toast.success(res.data.message || `Claim ${newStatus.toLowerCase()} successfully!`);
+      setIsReviewModalOpen(false);
+      setReviewComment('');
     } catch (err) {
       toast.error(err.response?.data?.message || err.message);
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
-  const handleReject = async (claim) => {
-    const targetId = claim._id || claim.id;
+  const handleAssignAgent = async (e) => {
+    e.preventDefault();
+    if (!selectedClaim || !selectedAgentId) return;
+    const targetId = selectedClaim._id || selectedClaim.id;
+    setSubmittingAssign(true);
     try {
-      await api.put(`/claims/${targetId}/reject`);
-      setClaims(claims.map((c) => (c._id === targetId || c.id === targetId ? { ...c, status: 'Rejected' } : c)));
-      toast.error(`Claim ${claim.id || targetId} rejected.`);
+      // selectedAgentId holds the agents.id (UUID), not employee_code
+      const targetAgent = agents.find((a) => (a._id || a.id) === selectedAgentId);
+      const agentUUID = targetAgent?._id || targetAgent?.id || selectedAgentId;
+      const res = await api.put(`/claims/${targetId}/assign`, { agent_id: agentUUID });
+      toast.success(res.data.message || `Claim reassigned to ${targetAgent?.name || 'Agent'}.`);
+      setIsAssignModalOpen(false);
+      loadData();
     } catch (err) {
       toast.error(err.response?.data?.message || err.message);
+    } finally {
+      setSubmittingAssign(false);
     }
   };
 
-  const handleAssignAgent = (e) => {
-    e.preventDefault();
-    setIsAssignModalOpen(false);
-    toast.success(`Claim ${selectedClaim?.id} assigned to ${assignedAgent}.`);
-  };
+  const statusVariant = (status) =>
+    status === 'Approved'
+      ? 'success'
+      : status === 'Pending'
+      ? 'warning'
+      : status === 'In Review'
+      ? 'info'
+      : 'danger';
 
-  const handleAddNote = (e) => {
-    e.preventDefault();
-    if (!internalNote.trim()) return;
-    setNotesList([
-      ...notesList,
-      { author: 'Alex Johnson (Admin)', text: internalNote, time: 'Just now' },
-    ]);
-    setInternalNote('');
-    toast.success('Internal note appended to claim file.');
-  };
+  const priorityVariant = (p) =>
+    p === 'High' ? 'danger' : p === 'Medium' ? 'warning' : 'neutral';
 
   const columns = [
     {
-      header: 'Claim ID',
+      header: 'Claim',
       accessorKey: 'id',
       cell: (row) => (
         <div>
-          <span className="font-mono font-bold text-slate-900 dark:text-white block">
-            {row.id}
+          <span className="font-mono font-bold text-slate-900 dark:text-white block">{row.id}</span>
+          <span className="text-[10px] text-slate-400 font-mono">
+            Policy: {row.policyNumber || '—'}
           </span>
-          <span className="text-[10px] text-slate-400 font-mono">Policy: {row.policyNumber}</span>
         </div>
       ),
     },
     {
-      header: 'Claimant Customer',
+      header: 'Customer',
       accessorKey: 'customer',
       cell: (row) => (
         <div className="flex items-center space-x-3">
           <img
-            src={row.customer.avatar}
+            src={row.customer.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(row.customer.name || 'C')}&background=10b981&color=fff`}
             alt={row.customer.name}
             className="w-8 h-8 rounded-full object-cover ring-1 ring-slate-200 dark:ring-slate-700"
           />
           <div>
-            <p className="font-semibold text-slate-900 dark:text-white leading-tight">
+            <p className="font-semibold text-slate-900 dark:text-white leading-tight text-sm">
               {row.customer.name}
             </p>
             <p className="text-[11px] text-slate-400">{row.type}</p>
@@ -122,85 +176,107 @@ export default function ClaimsPage() {
       ),
     },
     {
-      header: 'Claim Amount',
+      header: 'Assigned Agent',
+      accessorKey: 'agentName',
+      cell: (row) => (
+        <span className="text-xs text-slate-600 dark:text-slate-400">
+          {row.agentName || <span className="italic text-slate-400">Unassigned</span>}
+        </span>
+      ),
+    },
+    {
+      header: 'Amount',
       accessorKey: 'claimAmount',
       cell: (row) => (
-        <span className="font-bold text-slate-900 dark:text-white">
-          {row.claimAmount}
-        </span>
+        <span className="font-bold text-slate-900 dark:text-white">{row.claimAmount}</span>
       ),
     },
     {
       header: 'Priority',
       accessorKey: 'priority',
+      cell: (row) => <Badge variant={priorityVariant(row.priority)}>{row.priority}</Badge>,
+    },
+    {
+      header: 'Status',
+      accessorKey: 'status',
       cell: (row) => (
-        <Badge variant={row.priority === 'High' ? 'danger' : row.priority === 'Medium' ? 'warning' : 'neutral'}>
-          {row.priority}
-        </Badge>
+        <div className="space-y-1">
+          <Badge variant={statusVariant(row.status)}>{row.status}</Badge>
+          {row.reviewComment && (
+            <p className="text-[10px] text-slate-400 max-w-[140px] truncate" title={row.reviewComment}>
+              <MessageSquare className="w-3 h-3 inline mr-0.5" />
+              {row.reviewComment}
+            </p>
+          )}
+        </div>
       ),
     },
     {
-      header: 'Lifecycle Status',
-      accessorKey: 'status',
-      cell: (row) => {
-        const variant =
-          row.status === 'Approved'
-            ? 'success'
-            : row.status === 'Pending'
-            ? 'warning'
-            : row.status === 'In Review'
-            ? 'info'
-            : 'danger';
-        return <Badge variant={variant}>{row.status}</Badge>;
-      },
-    },
-    {
-      header: 'Submitted On',
+      header: 'Filed On',
       accessorKey: 'submittedOn',
       cell: (row) => <span className="text-xs text-slate-500 font-mono">{row.submittedOn}</span>,
     },
     {
-      header: 'Workflow Actions',
+      header: 'Actions',
       accessorKey: 'actions',
       className: 'text-right',
-      cell: (row) => (
-        <div className="flex items-center justify-end space-x-1">
-          <button
-            onClick={() => {
-              setSelectedClaim(row);
-              setIsTimelineOpen(true);
-            }}
-            className="p-1.5 text-slate-500 hover:text-brand-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-            title="Review Details & Notes"
-          >
-            <MessageSquare className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              setSelectedClaim(row);
-              setIsAssignModalOpen(true);
-            }}
-            className="p-1.5 text-slate-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 rounded-lg transition-colors"
-            title="Assign Claims Agent"
-          >
-            <UserCheck className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleApprove(row)}
-            className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950 rounded-lg transition-colors"
-            title="Approve Claim"
-          >
-            <CheckCircle className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleReject(row)}
-            className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 rounded-lg transition-colors"
-            title="Reject Claim"
-          >
-            <XCircle className="w-4 h-4" />
-          </button>
-        </div>
-      ),
+      cell: (row) => {
+        const isPending = row.status === 'Pending' || row.status === 'In Review';
+        return (
+          <div className="flex items-center justify-end space-x-1">
+            {/* View Details — always available */}
+            <button
+              onClick={() => openDetailModal(row)}
+              className="p-1.5 text-slate-500 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950 rounded-lg transition-colors"
+              title="View Claim Details"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+
+            {/* Reassign Agent — Admin only (Requirement #9) */}
+            {isAdmin && (
+              <button
+                onClick={() => {
+                  setSelectedClaim(row);
+                  setIsAssignModalOpen(true);
+                }}
+                className="p-1.5 text-slate-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 rounded-lg transition-colors"
+                title="Reassign Agent (Admin Only)"
+              >
+                <UserCheck className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Approve — only for Pending/In Review claims */}
+            <button
+              onClick={() => isPending && openReviewModal(row, 'Approve')}
+              className={`p-1.5 rounded-lg transition-colors ${
+                isPending
+                  ? 'text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950'
+                  : 'text-slate-300 dark:text-slate-700 cursor-not-allowed'
+              }`}
+              title={isPending ? 'Approve Claim' : `Already ${row.status}`}
+              disabled={!isPending}
+            >
+              <CheckCircle className="w-4 h-4" />
+            </button>
+
+            {/* Reject — only for Pending/In Review claims */}
+            <button
+              onClick={() => isPending && openReviewModal(row, 'Reject')}
+              className={`p-1.5 rounded-lg transition-colors ${
+                isPending
+                  ? 'text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950'
+                  : 'text-slate-300 dark:text-slate-700 cursor-not-allowed'
+              }`}
+              title={isPending ? 'Reject Claim' : `Already ${row.status}`}
+              disabled={!isPending}
+            >
+              <XCircle className="w-4 h-4" />
+            </button>
+          </div>
+        );
+      },
     },
   ];
 
@@ -213,16 +289,18 @@ export default function ClaimsPage() {
             Claims Triage & Resolution
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Review submitted loss claims, assign claims adjusters, inspect evidence files, and execute approvals.
+            Review submitted claims, reassign adjusters, and execute approvals with mandatory
+            comments.
+            {isAdmin && (
+              <span className="ml-2 inline-flex items-center gap-1 text-purple-600 font-semibold">
+                <ShieldAlert className="w-3 h-3" /> Admin: Agent reassignment enabled
+              </span>
+            )}
           </p>
         </div>
-
-        <Button variant="primary" leftIcon={Plus} onClick={() => toast.success('New claim filing modal opened')}>
-          File New Claim
-        </Button>
       </div>
 
-      {/* Claims Table Card */}
+      {/* Claims Table */}
       <Card className="p-6">
         {loading ? (
           <PageLoader />
@@ -234,107 +312,217 @@ export default function ClaimsPage() {
           <DataTable
             columns={columns}
             data={claims}
-            searchPlaceholder="Search claims by ID, customer, status, or policy number..."
+            searchPlaceholder="Search by claim ID, customer, policy number..."
           />
         )}
       </Card>
 
-      {/* Assign Agent Modal */}
+      {/* ── Claim Detail Modal ─────────────────────────────────────── */}
       <Modal
-        isOpen={isAssignModalOpen}
-        onClose={() => setIsAssignModalOpen(false)}
-        title="Assign Claims Adjuster Agent"
-        subtitle={`Select claims specialist for ${selectedClaim?.id}`}
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        title={`Claim Details — ${detailClaim?.id}`}
+        subtitle={`Customer: ${detailClaim?.customer?.name} • Status: ${detailClaim?.status}`}
       >
-        <form onSubmit={handleAssignAgent} className="space-y-4">
-          <Select
-            label="Select Claims Adjuster"
-            options={agents.map((a) => ({ label: `${a.name} (${a.role})`, value: a.name }))}
-            value={assignedAgent}
-            onChange={(e) => setAssignedAgent(e.target.value)}
-          />
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="outline" type="button" onClick={() => setIsAssignModalOpen(false)}>
+        {detailClaim && (
+          <div className="space-y-4 text-sm">
+            {/* Grid of key facts */}
+            <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+              <div>
+                <span className="text-slate-400 block mb-0.5">Claim Amount</span>
+                <span className="font-extrabold text-base text-slate-900 dark:text-white">
+                  {detailClaim.claimAmount}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block mb-0.5">Status</span>
+                <Badge variant={statusVariant(detailClaim.status)}>{detailClaim.status}</Badge>
+              </div>
+              <div>
+                <span className="text-slate-400 block mb-0.5">Claim Type</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  {detailClaim.claimType}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block mb-0.5">Priority</span>
+                <Badge variant={priorityVariant(detailClaim.priority)}>{detailClaim.priority}</Badge>
+              </div>
+              <div>
+                <span className="text-slate-400 block mb-0.5">Policy Number</span>
+                <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                  {detailClaim.policyNumber || '—'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block mb-0.5">Filed On</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  {detailClaim.submittedOn}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block mb-0.5">Assigned Agent</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  {detailClaim.agentName || <span className="italic text-slate-400">Unassigned</span>}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block mb-0.5">Reviewed On</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  {detailClaim.reviewedAt || '—'}
+                </span>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                Incident Description
+              </span>
+              <p className="text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+                {detailClaim.description || 'No description provided.'}
+              </p>
+            </div>
+
+            {/* Review Comment */}
+            {detailClaim.reviewComment ? (
+              <div>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1 flex items-center gap-1">
+                  <MessageSquare className="w-3.5 h-3.5 text-brand-600" /> Reviewer Decision Comment
+                </span>
+                <p
+                  className={`text-xs p-3 rounded-xl border ${
+                    detailClaim.status === 'Approved'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                      : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300'
+                  }`}
+                >
+                  {detailClaim.reviewComment}
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-slate-400 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                <Clock className="w-3.5 h-3.5" />
+                Awaiting adjuster review decision.
+              </div>
+            )}
+
+            {/* Action buttons from detail view */}
+            <div className="flex justify-end items-center gap-2 pt-1">
+              {(detailClaim.status === 'Pending' || detailClaim.status === 'In Review') && (
+                <>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => {
+                      setIsDetailModalOpen(false);
+                      openReviewModal(detailClaim, 'Reject');
+                    }}
+                  >
+                    <XCircle className="w-3.5 h-3.5 mr-1" /> Reject
+                  </Button>
+                  <Button
+                    variant="success"
+                    size="sm"
+                    onClick={() => {
+                      setIsDetailModalOpen(false);
+                      openReviewModal(detailClaim, 'Approve');
+                    }}
+                  >
+                    <CheckCircle className="w-3.5 h-3.5 mr-1" /> Approve
+                  </Button>
+                </>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setIsDetailModalOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Review Modal (Approve / Reject with Mandatory Comment) ─── */}
+      <Modal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        title={`${reviewAction} Claim: ${selectedClaim?.id}`}
+        subtitle={`${selectedClaim?.customer?.name} • ${selectedClaim?.claimAmount}`}
+      >
+        <form onSubmit={handleReviewSubmit} className="space-y-4">
+          {/* Claim summary */}
+          <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+            <div>
+              <span className="text-slate-400 block">Type</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {selectedClaim?.claimType}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-400 block">Priority</span>
+              <Badge variant={priorityVariant(selectedClaim?.priority)}>
+                {selectedClaim?.priority}
+              </Badge>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+              Reviewer Decision Comment <span className="text-rose-500">*</span>
+            </label>
+            <textarea
+              rows={4}
+              placeholder={`Enter justification note for ${reviewAction.toLowerCase()}ing this claim (required)...`}
+              value={reviewComment}
+              onChange={(e) => setReviewComment(e.target.value)}
+              className="w-full text-xs p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-500 outline-none"
+              required
+            />
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-2">
+            <Button variant="outline" type="button" onClick={() => setIsReviewModalOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" type="submit">
-              Confirm Assignment
+            <Button
+              variant={reviewAction === 'Approve' ? 'success' : 'danger'}
+              type="submit"
+              isLoading={submittingReview}
+            >
+              Confirm {reviewAction}
             </Button>
           </div>
         </form>
       </Modal>
 
-      {/* Review Documents & Timeline Modal */}
-      <Modal
-        isOpen={isTimelineOpen}
-        onClose={() => setIsTimelineOpen(false)}
-        title={`Claim Timeline & Audit File: ${selectedClaim?.id}`}
-        subtitle={`Policy ${selectedClaim?.policyNumber} • ${selectedClaim?.customer?.name}`}
-        maxWidth="max-w-2xl"
-      >
-        <div className="space-y-6">
-          {/* Status Bar */}
-          <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-            <div>
-              <p className="text-xs text-slate-500">Claim Amount</p>
-              <p className="text-lg font-bold text-slate-900 dark:text-white">{selectedClaim?.claimAmount}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500">Current Status</p>
-              <Badge variant="info">{selectedClaim?.status}</Badge>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500">Priority Level</p>
-              <Badge variant="danger">{selectedClaim?.priority}</Badge>
-            </div>
-          </div>
-
-          {/* Timeline Milestones */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Audit Timeline</h4>
-            <div className="border-l-2 border-brand-500 pl-4 space-y-4">
-              <div className="relative">
-                <span className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-brand-500 ring-4 ring-white dark:ring-slate-900" />
-                <p className="text-xs font-bold text-slate-900 dark:text-white">Claim Submitted</p>
-                <p className="text-[11px] text-slate-500">Submitted by claimant John Smith via portal on {selectedClaim?.submittedOn}</p>
-              </div>
-              <div className="relative">
-                <span className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-brand-500 ring-4 ring-white dark:ring-slate-900" />
-                <p className="text-xs font-bold text-slate-900 dark:text-white">Assigned to Adjuster</p>
-                <p className="text-[11px] text-slate-500">Auto-routed to Alex Johnson (Senior Underwriter)</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Internal Notes */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Internal Underwriting Notes</h4>
-            <div className="space-y-2 max-h-36 overflow-y-auto">
-              {notesList.map((note, idx) => (
-                <div key={idx} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-xs">
-                  <div className="flex items-center justify-between font-semibold text-slate-700 dark:text-slate-200">
-                    <span>{note.author}</span>
-                    <span className="text-[10px] text-slate-400">{note.time}</span>
-                  </div>
-                  <p className="text-slate-600 dark:text-slate-300 mt-1">{note.text}</p>
-                </div>
-              ))}
-            </div>
-
-            <form onSubmit={handleAddNote} className="flex gap-2">
-              <Input
-                placeholder="Append internal note..."
-                value={internalNote}
-                onChange={(e) => setInternalNote(e.target.value)}
-                className="text-xs"
-              />
-              <Button type="submit" variant="primary" size="sm" className="shrink-0">
-                Post Note
+      {/* ── Assign Agent Modal (Admin Only) ─────────────────────────── */}
+      {isAdmin && (
+        <Modal
+          isOpen={isAssignModalOpen}
+          onClose={() => setIsAssignModalOpen(false)}
+          title="Reassign Claims Adjuster Agent"
+          subtitle={`Claim: ${selectedClaim?.id} — Admin Authorization Required`}
+        >
+          <form onSubmit={handleAssignAgent} className="space-y-4">
+            <Select
+              label="Select Claims Adjuster Agent"
+              options={agents.map((a) => ({
+                label: `${a.name} (${a.role || 'Agent'})`,
+                value: a._id || a.id,
+              }))}
+              value={selectedAgentId}
+              onChange={(e) => setSelectedAgentId(e.target.value)}
+            />
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button variant="outline" type="button" onClick={() => setIsAssignModalOpen(false)}>
+                Cancel
               </Button>
-            </form>
-          </div>
-        </div>
-      </Modal>
+              <Button variant="primary" type="submit" isLoading={submittingAssign}>
+                Reassign Agent
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

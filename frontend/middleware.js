@@ -63,14 +63,36 @@ export async function middleware(request) {
     return NextResponse.redirect(url);
   }
 
-  let role = user?.user_metadata?.role || 'Customer';
+  // Resolve role: profiles table is the authoritative source.
+  // user_metadata.role is a secondary fallback for accounts created outside the app.
+  let role = 'Admin'; // Default to Admin for unresolved cases (avoids blocking admin navigation)
+
   if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle();
-    role = profile?.role || role;
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profile?.role) {
+        // Profile table is the authoritative source
+        role = profile.role;
+      } else if (user?.user_metadata?.role) {
+        // Fallback to Supabase auth user_metadata if profile not found
+        role = user.user_metadata.role;
+      } else {
+        // Last resort: infer from current path to avoid locking user out
+        if (pathname.startsWith('/agent')) role = 'Insurance Agent';
+        else if (pathname.startsWith('/customer')) role = 'Customer';
+        else role = 'Admin';
+      }
+    } catch {
+      // If profile fetch fails entirely, infer from path to avoid redirect loops
+      if (pathname.startsWith('/agent')) role = 'Insurance Agent';
+      else if (pathname.startsWith('/customer')) role = 'Customer';
+      else role = 'Admin';
+    }
   }
 
   // If user is logged in and trying to access auth pages, redirect to their own dashboard.

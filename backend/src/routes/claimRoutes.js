@@ -9,5 +9,6 @@ router.post('/', ctrl.create);
 router.put('/:id', ctrl.update);
 router.put('/:id/approve', ctrl.approve);
 router.put('/:id/reject', ctrl.reject);
+router.put('/:id/assign', ctrl.assignAgent);
 
 module.exports = router;
