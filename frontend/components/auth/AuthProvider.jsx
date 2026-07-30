@@ -62,7 +62,7 @@ export function AuthProvider({ children }) {
 
         // Handle specific auth events
         if (event === 'SIGNED_OUT') {
-          router.push('/login');
+          router.push('/register');
         }
       }
     );

@@ -45,7 +45,6 @@ export function Navbar({ onMobileMenuToggle }) {
     try {
       await signOut();
       toast.success('Signed out successfully');
-      router.push('/login');
     } catch (error) {
       toast.error('Failed to sign out');
     } finally {
